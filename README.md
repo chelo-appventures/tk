@@ -7,7 +7,7 @@
 - **Visual Overview:** Quickly see your current focus and the status of your projects.
 - **FZF-powered Workflow:** Interactive selection of projects and tasks.
 - **Native Markdown:** All tasks are `.md` files, allowing you to use any text editor.
-- **Organized Structure:** Automatic classification into `backlog`, `blocked`, and `done`.
+- **Organized Structure:** Automatic classification into `backlog`, `review`, `blocked`, and `done`.
 
 ## 🛠 Requirements
 
@@ -29,6 +29,7 @@ The script expects your tasks directory to be at `$HOME/tasks` with the followin
 ├── 00_WORKING/         # Symbolic links to active tasks
 ├── Project_A/
 │   ├── backlog/
+│   ├── review/
 │   ├── blocked/
 │   └── done/
 └── Project_B/
@@ -41,7 +42,7 @@ The script expects your tasks directory to be at `$HOME/tasks` with the followin
 Sets up the directory structure in `~/tasks`, creates a default task template, and links the script to `~/bin/tk`.
 
 ### `tk proj {project_name}`
-Creates the necessary folder structure (`backlog`, `blocked`, `done`) for a new project within `~/tasks`.
+Creates the necessary folder structure (`backlog`, `review`, `blocked`, `done`) for a new project within `~/tasks`.
 
 ### `tk status`
 Shows a summary of what you have in `00_WORKING` (your current focus) and a task count by status for each active project.
@@ -51,6 +52,12 @@ Creates a new task from the template in the `backlog` directory of a selected pr
 
 ### `tk work`
 Allows you to select a task from any project to create a symbolic link in `00_WORKING`, marking it as your current priority.
+
+### `tk review`
+Move a task to the `review/` folder of its project. If the task was active in `00_WORKING`, the symbolic link is removed.
+
+### `tk done`
+Move a task to the `done/` folder of its project. If the task was active in `00_WORKING`, the symbolic link is removed.
 
 ### `tk open`
 Global task search with preview (`bat`) and automatic opening in Neovim.

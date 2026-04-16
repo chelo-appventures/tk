@@ -43,7 +43,7 @@ cmd_status() {
     -not -path "*00_WORKING*" -not -path "*99_ARCHIVE*" | sort | while read -r project; do
 
     echo -e "${YELLOW}📂 $(basename "$project")${NC}"
-    for s in "backlog" "wip" "blocked" "done"; do
+    for s in "backlog" "review" "blocked" "done"; do
       local folder="$project/$s"
       if [ -d "$folder" ]; then
         local count=$(find "$folder" -name "*.md" 2>/dev/null | wc -l)
@@ -87,7 +87,38 @@ cmd_open() {
   [[ -n "$file" ]] && nvim "$file"
 }
 
-# 5. INIT: Initialize structure and symbolic link
+# Helper: Move task to a new status
+cmd_move() {
+  local target_status="$1"
+  local file=$(find "$TASKS_DIR" -not -path '*/.*' -not -path "*/00_WORKING/*" -name "*.md" | fzf --prompt "Move to $target_status: " --height 40% --reverse)
+  
+  if [[ -n "$file" ]]; then
+    local filename=$(basename "$file")
+    local project_dir=$(dirname $(dirname "$file"))
+    local dest="$project_dir/$target_status/$filename"
+    
+    mkdir -p "$project_dir/$target_status"
+    mv "$file" "$dest"
+    
+    # Cleanup symlink in 00_WORKING if it exists
+    find "$WORKING_DIR" -lname "$file" -delete
+    find "$WORKING_DIR" -name "$filename" -delete 2>/dev/null # fallback for some symlink behaviors
+    
+    echo -e "${GREEN}✅ Task moved to $target_status${NC}"
+  fi
+}
+
+# 5. REVIEW: Move task to review
+cmd_review() {
+  cmd_move "review"
+}
+
+# 6. DONE: Move task to done
+cmd_done() {
+  cmd_move "done"
+}
+
+# 7. INIT: Initialize structure and symbolic link
 cmd_init() {
   local bin_dir="$HOME/bin"
   local tk_bin="$bin_dir/tk"
@@ -139,7 +170,7 @@ EOF
   echo -e "\n${GREEN}✅ Ready!${NC} Make sure $bin_dir is in your PATH."
 }
 
-# 6. SYNC: Synchronize project via rsync
+# 8. SYNC: Synchronize project via rsync
 cmd_sync() {
   local project_name="$1"
   local remote_url="$2"
@@ -160,7 +191,7 @@ cmd_sync() {
   rsync -avz --progress "$project_path/" "$remote_url/"
 }
 
-# 7. PROJ: Create project structure
+# 9. PROJ: Create project structure
 cmd_proj() {
   local project_name="$1"
 
@@ -178,6 +209,7 @@ cmd_proj() {
 
   echo -e "${BLUE}📁 Creating project: $project_name...${NC}"
   mkdir -p "$project_path/backlog"
+  mkdir -p "$project_path/review"
   mkdir -p "$project_path/blocked"
   mkdir -p "$project_path/done"
   
@@ -191,10 +223,12 @@ show_help() {
   echo -e "Usage: tk {command} [args]\n"
   echo -e "Commands:"
   echo -e "  ${GREEN}init${NC}              Initialize folder structure and link tk to ~/bin"
-  echo -e "  ${GREEN}proj {name}${NC}       Create a new project structure (backlog, blocked, done)"
+  echo -e "  ${GREEN}proj {name}${NC}       Create a new project structure (backlog, review, blocked, done)"
   echo -e "  ${GREEN}status${NC}            Show current focus and active projects summary"
   echo -e "  ${GREEN}new${NC}               Create a new task from template in a project's backlog"
   echo -e "  ${GREEN}work${NC}              Link a task to 00_WORKING (sets current focus)"
+  echo -e "  ${GREEN}review${NC}            Move a task to the 'review' folder"
+  echo -e "  ${GREEN}done${NC}              Move a task to the 'done' folder"
   echo -e "  ${GREEN}open${NC}              Search and open any task using fzf and nvim"
   echo -e "  ${GREEN}sync {proj} {url}${NC} Sync project folder to a remote host via rsync"
   echo -e "\nOptions:"
@@ -223,6 +257,8 @@ status) cmd_status ;;
 new) cmd_new ;;
 work) cmd_work ;;
 open) cmd_open ;;
+review) cmd_review ;;
+done) cmd_done ;;
 init) cmd_init ;;
 sync) cmd_sync "$2" "$3" ;;
 proj) cmd_proj "$2" ;;
