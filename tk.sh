@@ -177,6 +177,40 @@ cmd_proj() {
   echo -e "${GREEN}✅ Project created in $project_path${NC}"
 }
 
+# --- HELP FUNCTIONS ---
+
+show_help() {
+  echo -e "${BLUE}tk - Minimalist Task Manager${NC}"
+  echo -e "Usage: tk {command} [args]\n"
+  echo -e "Commands:"
+  echo -e "  ${GREEN}init${NC}              Initialize folder structure and link tk to ~/bin"
+  echo -e "  ${GREEN}proj {name}${NC}       Create a new project structure (backlog, blocked, done)"
+  echo -e "  ${GREEN}status${NC}            Show current focus and active projects summary"
+  echo -e "  ${GREEN}new${NC}               Create a new task from template in a project's backlog"
+  echo -e "  ${GREEN}work${NC}              Link a task to 00_WORKING (sets current focus)"
+  echo -e "  ${GREEN}open${NC}              Search and open any task using fzf and nvim"
+  echo -e "  ${GREEN}sync {proj} {url}${NC} Sync project folder to a remote host via rsync"
+  echo -e "\nOptions:"
+  echo -e "  ${YELLOW}--help${NC}                 Show this help message"
+  echo -e "  ${YELLOW}--help-ai-jira-sync${NC}    Show guide for AI-driven Jira task syncing"
+}
+
+show_jira_help() {
+  local script_dir
+  script_dir="$(cd "$(dirname "$0")" && pwd)"
+  local jira_guide="$script_dir/jira-acli-task-creation.md"
+  
+  if [ -f "$jira_guide" ]; then
+    if command -v bat &> /dev/null; then
+      bat --style=plain --paging=never "$jira_guide"
+    else
+      cat "$jira_guide"
+    fi
+  else
+    echo -e "${RED}Error: jira-acli-task-creation.md not found in $script_dir${NC}"
+  fi
+}
+
 # --- MAIN LOGIC ---
 
 case "$1" in
@@ -187,8 +221,10 @@ open) cmd_open ;;
 init) cmd_init ;;
 sync) cmd_sync "$2" "$3" ;;
 proj) cmd_proj "$2" ;;
+--help) show_help ;;
+--help-ai-jira-sync) show_jira_help ;;
 *)
-  echo "Usage: tk {status|new|work|open|init|sync|proj}"
+  show_help
   exit 1
   ;;
 esac
