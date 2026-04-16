@@ -1,76 +1,76 @@
-# tk - Gestor de Tareas Minimalista
+# tk - Minimalist Task Manager
 
-`tk` es una herramienta ligera de línea de comandos escrita en Bash para gestionar tareas y proyectos utilizando archivos Markdown. Está diseñada para ser rápida, visual y compatible con flujos de trabajo basados en terminal.
+`tk` is a lightweight command-line tool written in Bash for managing tasks and projects using Markdown files. It is designed to be fast, visual, and compatible with terminal-based workflows.
 
-## 🚀 Características
+## 🚀 Features
 
-- **Resumen visual:** Visualiza rápidamente tu foco actual y el estado de tus proyectos.
-- **Flujo basado en FZF:** Selección interactiva de proyectos y tareas.
-- **Markdown nativo:** Todas las tareas son archivos `.md`, lo que permite usar cualquier editor de texto.
-- **Estructura organizada:** Clasificación automática en `backlog`, `blocked` y `done`.
+- **Visual Overview:** Quickly see your current focus and the status of your projects.
+- **FZF-powered Workflow:** Interactive selection of projects and tasks.
+- **Native Markdown:** All tasks are `.md` files, allowing you to use any text editor.
+- **Organized Structure:** Automatic classification into `backlog`, `blocked`, and `done`.
 
-## 🛠 Requisitos
+## 🛠 Requirements
 
-Para que `tk` funcione correctamente, necesitas tener instalados:
+For `tk` to function correctly, you need the following installed:
 
 - **Bash** (v4+)
-- [**fzf**](https://github.com/junegunn/fzf): Para la búsqueda interactiva.
-- [**bat**](https://github.com/sharkdp/bat): Para previsualizar tareas (opcional pero recomendado).
-- [**Neovim (nvim)**](https://neovim.io/): Como editor predeterminado para las tareas.
+- [**fzf**](https://github.com/junegunn/fzf): For interactive searching.
+- [**bat**](https://github.com/sharkdp/bat): For task previews (optional but recommended).
+- [**Neovim (nvim)**](https://neovim.io/): As the default editor for tasks.
 
-## 📂 Estructura de Directorios
+## 📂 Directory Structure
 
-El script espera que tu directorio de tareas esté en `$HOME/tasks` con la siguiente estructura:
+The script expects your tasks directory to be at `$HOME/tasks` with the following structure:
 
 ```text
 ~/tasks/
 ├── .templates/
-│   └── task.md         # Plantilla base para nuevas tareas
-├── 00_WORKING/         # Enlaces simbólicos a tareas activas
-├── Proyecto_A/
+│   └── task.md         # Base template for new tasks
+├── 00_WORKING/         # Symbolic links to active tasks
+├── Project_A/
 │   ├── backlog/
 │   ├── blocked/
 │   └── done/
-└── Proyecto_B/
+└── Project_B/
     └── ...
 ```
 
-## ⌨️ Uso
+## ⌨️ Usage
 
 ### `tk init`
-Configura la estructura de directorios en `~/tasks`, crea una plantilla de tarea y vincula el script a `~/bin/tk`.
+Sets up the directory structure in `~/tasks`, creates a default task template, and links the script to `~/bin/tk`.
 
-### `tk proj {nombre_proyecto}`
-Crea la estructura de carpetas necesaria (`backlog`, `blocked`, `done`) para un nuevo proyecto dentro de `~/tasks`.
+### `tk proj {project_name}`
+Creates the necessary folder structure (`backlog`, `blocked`, `done`) for a new project within `~/tasks`.
 
 ### `tk status`
-Muestra el resumen de lo que tienes en `00_WORKING` (tu foco actual) y un conteo de tareas por estado en cada proyecto activo.
+Shows a summary of what you have in `00_WORKING` (your current focus) and a task count by status for each active project.
 
 ### `tk new`
-Crea una nueva tarea a partir de la plantilla en el directorio `backlog` de un proyecto seleccionado. Solicita un "slug" para el nombre del archivo.
+Creates a new task from the template in the `backlog` directory of a selected project. Prompts for a "slug" for the filename.
 
 ### `tk work`
-Permite seleccionar una tarea de cualquier proyecto para crear un enlace simbólico en `00_WORKING`, marcándola como tu prioridad actual.
+Allows you to select a task from any project to create a symbolic link in `00_WORKING`, marking it as your current priority.
 
 ### `tk open`
-Buscador global de tareas con previsualización (`bat`) y apertura automática en Neovim.
+Global task search with preview (`bat`) and automatic opening in Neovim.
 
-### `tk sync {proyecto} {url_remota}`
-Sincroniza el contenido de un proyecto específico con un servidor remoto utilizando `rsync`. Ejemplo: `tk sync mi-proyecto usuario@servidor:/home/ruta`
+### `tk sync {project} {remote_url}`
+Synchronizes the content of a specific project with a remote server using `rsync`. Example: `tk sync my-project user@server:/path/to/dest`
 
-## 🔧 Instalación
+## 🔧 Installation
 
-1. Clona este repositorio:
+1. Clone this repository:
    ```bash
-   git clone https://github.com/tu-usuario/tk.git
+   git clone https://github.com/your-user/tk.git
    cd tk
    ```
-2. Dale permisos de ejecución al script e inicialízalo:
+2. Grant execution permissions to the script and initialize it:
    ```bash
    chmod +x tk.sh
    ./tk.sh init
    ```
-3. Asegúrate de que `~/bin` esté en tu `$PATH`. Si no lo está, añade esto a tu `.zshrc` o `.bashrc`:
+3. Ensure that `~/bin` is in your `$PATH`. If it isn't, add this to your `.zshrc` or `.bashrc`:
    ```bash
    export PATH="$HOME/bin:$PATH"
    ```
