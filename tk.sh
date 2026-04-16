@@ -1,6 +1,15 @@
 #!/bin/bash
 
 # Configuration
+# Resolve the real path of the script to find relative files
+SOURCE="${BASH_SOURCE[0]}"
+while [ -L "$SOURCE" ]; do
+  DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )"
+  SOURCE="$(readlink "$SOURCE")"
+  [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE"
+done
+SCRIPT_DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )"
+
 TASKS_DIR="$HOME/tasks"
 TEMPLATE="$TASKS_DIR/.templates/task.md"
 WORKING_DIR="$TASKS_DIR/00_WORKING"
@@ -97,11 +106,9 @@ cmd_init() {
   mkdir -p "$TASKS_DIR/99_ARCHIVE"
   echo "📂 Folder structure created in $TASKS_DIR"
 
-  # Determine script and template paths
-  local script_dir
-  script_dir="$(cd "$(dirname "$0")" && pwd)"
-  local source_path="$script_dir/$(basename "$0")"
-  local template_source="$script_dir/task_template.md"
+  # Source paths (SCRIPT_DIR was resolved at script start)
+  local source_path="$SCRIPT_DIR/$(basename "$0")"
+  local template_source="$SCRIPT_DIR/task_template.md"
 
   # Copy template from repository if it exists
   if [ -f "$template_source" ]; then
@@ -196,9 +203,7 @@ show_help() {
 }
 
 show_jira_help() {
-  local script_dir
-  script_dir="$(cd "$(dirname "$0")" && pwd)"
-  local jira_guide="$script_dir/jira-acli-task-creation.md"
+  local jira_guide="$SCRIPT_DIR/jira-acli-task-creation.md"
   
   if [ -f "$jira_guide" ]; then
     if command -v bat &> /dev/null; then
@@ -207,7 +212,7 @@ show_jira_help() {
       cat "$jira_guide"
     fi
   else
-    echo -e "${RED}Error: jira-acli-task-creation.md not found in $script_dir${NC}"
+    echo -e "${RED}Error: jira-acli-task-creation.md not found in $SCRIPT_DIR${NC}"
   fi
 }
 
