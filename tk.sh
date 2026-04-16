@@ -153,6 +153,30 @@ cmd_sync() {
   rsync -avz --progress "$project_path/" "$remote_url/"
 }
 
+# 7. PROJ: Crear estructura de un proyecto
+cmd_proj() {
+  local project_name="$1"
+
+  if [[ -z "$project_name" ]]; then
+    echo -n "Nombre del nuevo proyecto: "
+    read project_name
+  fi
+
+  local project_path="$TASKS_DIR/$project_name"
+
+  if [[ -d "$project_path" ]]; then
+    echo -e "${YELLOW}⚠️ El proyecto '$project_name' ya existe.${NC}"
+    return 1
+  fi
+
+  echo -e "${BLUE}📁 Creando proyecto: $project_name...${NC}"
+  mkdir -p "$project_path/backlog"
+  mkdir -p "$project_path/blocked"
+  mkdir -p "$project_path/done"
+  
+  echo -e "${GREEN}✅ Proyecto creado en $project_path${NC}"
+}
+
 # --- LÓGICA PRINCIPAL ---
 
 case "$1" in
@@ -162,8 +186,9 @@ work) cmd_work ;;
 open) cmd_open ;;
 init) cmd_init ;;
 sync) cmd_sync "$2" "$3" ;;
+proj) cmd_proj "$2" ;;
 *)
-  echo "Uso: tk {status|new|work|open|init|sync}"
+  echo "Uso: tk {status|new|work|open|init|sync|proj}"
   exit 1
   ;;
 esac

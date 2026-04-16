@@ -7,7 +7,7 @@
 - **Resumen visual:** Visualiza rápidamente tu foco actual y el estado de tus proyectos.
 - **Flujo basado en FZF:** Selección interactiva de proyectos y tareas.
 - **Markdown nativo:** Todas las tareas son archivos `.md`, lo que permite usar cualquier editor de texto.
-- **Estructura organizada:** Clasificación automática en `backlog`, `wip`, `blocked` y `done`.
+- **Estructura organizada:** Clasificación automática en `backlog`, `blocked` y `done`.
 
 ## 🛠 Requisitos
 
@@ -29,7 +29,6 @@ El script espera que tu directorio de tareas esté en `$HOME/tasks` con la sigui
 ├── 00_WORKING/         # Enlaces simbólicos a tareas activas
 ├── Proyecto_A/
 │   ├── backlog/
-│   ├── wip/
 │   ├── blocked/
 │   └── done/
 └── Proyecto_B/
@@ -40,6 +39,9 @@ El script espera que tu directorio de tareas esté en `$HOME/tasks` con la sigui
 
 ### `tk init`
 Configura la estructura de directorios en `~/tasks`, crea una plantilla de tarea y vincula el script a `~/bin/tk`.
+
+### `tk proj {nombre_proyecto}`
+Crea la estructura de carpetas necesaria (`backlog`, `blocked`, `done`) para un nuevo proyecto dentro de `~/tasks`.
 
 ### `tk status`
 Muestra el resumen de lo que tienes en `00_WORKING` (tu foco actual) y un conteo de tareas por estado en cada proyecto activo.
