@@ -4,11 +4,11 @@
 # Resolve the real path of the script to find relative files
 SOURCE="${BASH_SOURCE[0]}"
 while [ -L "$SOURCE" ]; do
-  DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )"
+  DIR="$(cd -P "$(dirname "$SOURCE")" >/dev/null 2>&1 && pwd)"
   SOURCE="$(readlink "$SOURCE")"
   [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE"
 done
-SCRIPT_DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )"
+SCRIPT_DIR="$(cd -P "$(dirname "$SOURCE")" >/dev/null 2>&1 && pwd)"
 
 TASKS_DIR="$HOME/tasks"
 TEMPLATE="$TASKS_DIR/.templates/task.md"
@@ -91,19 +91,19 @@ cmd_open() {
 cmd_move() {
   local target_status="$1"
   local file=$(find "$TASKS_DIR" -not -path '*/.*' -not -path "*/00_WORKING/*" -name "*.md" | fzf --prompt "Move to $target_status: " --height 40% --reverse)
-  
+
   if [[ -n "$file" ]]; then
     local filename=$(basename "$file")
     local project_dir=$(dirname $(dirname "$file"))
     local dest="$project_dir/$target_status/$filename"
-    
+
     mkdir -p "$project_dir/$target_status"
     mv "$file" "$dest"
-    
+
     # Cleanup symlink in 00_WORKING if it exists
     find "$WORKING_DIR" -lname "$file" -delete
     find "$WORKING_DIR" -name "$filename" -delete 2>/dev/null # fallback for some symlink behaviors
-    
+
     echo -e "${GREEN}✅ Task moved to $target_status${NC}"
   fi
 }
@@ -250,7 +250,7 @@ cmd_proj() {
   mkdir -p "$project_path/review"
   mkdir -p "$project_path/blocked"
   mkdir -p "$project_path/done"
-  
+
   echo -e "${GREEN}✅ Project created in $project_path${NC}"
 }
 
@@ -260,26 +260,26 @@ show_help() {
   echo -e "${BLUE}tk - Minimalist Task Manager${NC}"
   echo -e "Usage: tk {command} [args]\n"
   echo -e "Commands:"
-  echo -e "  ${GREEN}init${NC}              Initialize folder structure and link tk to ~/bin"
-  echo -e "  ${GREEN}proj {name}${NC}       Create a new project structure (backlog, review, blocked, done)"
-  echo -e "  ${GREEN}status${NC}            Show current focus and active projects summary"
-  echo -e "  ${GREEN}new${NC}               Create a new task from template in a project's backlog"
-  echo -e "  ${GREEN}work${NC}              Link a task to 00_WORKING (sets current focus)"
-  echo -e "  ${GREEN}review${NC}            Move a task to the 'review' folder"
-  echo -e "  ${GREEN}done${NC}              Move a task to the 'done' folder"
-  echo -e "  ${GREEN}open${NC}              Search and open any task using fzf and nvim"
-  echo -e "  ${GREEN}push {proj} {host}${NC} Push project folder to remote (assumes remote ~/tasks/)"
-  echo -e "  ${GREEN}pull {proj} {host}${NC} Pull project folder from remote (assumes remote ~/tasks/)"
+  echo -e "  ${GREEN}init${NC}                 Initialize folder structure and link tk to ~/bin"
+  echo -e "  ${GREEN}proj[ect] {name}${NC}     Create a new project structure (backlog, review, blocked, done)"
+  echo -e "  ${GREEN}status|list|ls${NC}       Show current focus and active projects summary"
+  echo -e "  ${GREEN}new${NC}                  Create a new task from template in a project's backlog"
+  echo -e "  ${GREEN}work|current|cur${NC}     Link a task to 00_WORKING (sets current focus)"
+  echo -e "  ${GREEN}review${NC}               Move a task to the 'review' folder"
+  echo -e "  ${GREEN}done${NC}                 Move a task to the 'done' folder"
+  echo -e "  ${GREEN}open${NC}                 Search and open any task using fzf and nvim"
+  echo -e "  ${GREEN}push {proj} {host}${NC}   Push project folder to remote (assumes remote ~/tasks/)"
+  echo -e "  ${GREEN}pull {proj} {host}${NC}   Pull project folder from remote (assumes remote ~/tasks/)"
   echo -e "\nOptions:"
-  echo -e "  ${YELLOW}--help${NC}                 Show this help message"
-  echo -e "  ${YELLOW}--help-ai-jira-sync${NC}    Show guide for AI-driven Jira task syncing"
+  echo -e "  ${YELLOW}--help${NC}              Show this help message"
+  echo -e "  ${YELLOW}--help-ai-jira-sync${NC} Show guide for AI-driven Jira task syncing"
 }
 
 show_jira_help() {
   local jira_guide="$SCRIPT_DIR/jira-acli-task-creation.md"
-  
+
   if [ -f "$jira_guide" ]; then
-    if command -v bat &> /dev/null; then
+    if command -v bat &>/dev/null; then
       bat --style=plain --paging=never "$jira_guide"
     else
       cat "$jira_guide"
@@ -292,16 +292,16 @@ show_jira_help() {
 # --- MAIN LOGIC ---
 
 case "$1" in
-status) cmd_status ;;
+status | list | ls) cmd_status ;;
 new) cmd_new ;;
-work) cmd_work ;;
+work | current | cur) cmd_work ;;
 open) cmd_open ;;
 review) cmd_review ;;
 done) cmd_done ;;
 init) cmd_init ;;
 push) cmd_push "$2" "$3" ;;
 pull) cmd_pull "$2" "$3" ;;
-proj) cmd_proj "$2" ;;
+project | proj) cmd_proj "$2" ;;
 --help) show_help ;;
 --help-ai-jira-sync) show_jira_help ;;
 *)
