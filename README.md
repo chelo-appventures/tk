@@ -62,8 +62,11 @@ Move a task to the `done/` folder of its project. If the task was active in `00_
 ### `tk open`
 Global task search with preview (`bat`) and automatic opening in Neovim.
 
-### `tk sync {project} {remote_url}`
-Synchronizes the content of a specific project with a remote server using `rsync`. Example: `tk sync my-project user@server:/path/to/dest`
+### `tk push {project} {user@host}`
+Pushes the content of a local project to the same path on a remote server (`~/tasks/{project}`). Example: `tk push my-project user@server`
+
+### `tk pull {project} {user@host}`
+Pulls the content of a remote project from the same path on a remote server (`~/tasks/{project}`) to your local tasks directory. Example: `tk pull my-project user@server`
 
 ## 🔧 Installation
 

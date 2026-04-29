@@ -170,13 +170,13 @@ EOF
   echo -e "\n${GREEN}✅ Ready!${NC} Make sure $bin_dir is in your PATH."
 }
 
-# 8. SYNC: Synchronize project via rsync
-cmd_sync() {
+# 8. PUSH: Push project to remote via rsync
+cmd_push() {
   local project_name="$1"
-  local remote_url="$2"
+  local remote_input="$2"
 
-  if [[ -z "$project_name" || -z "$remote_url" ]]; then
-    echo -e "${RED}Usage: tk sync {project_name} {user@host:path}${NC}"
+  if [[ -z "$project_name" || -z "$remote_input" ]]; then
+    echo -e "${RED}Usage: tk push {project_name} {user@host[:path]}${NC}"
     return 1
   fi
 
@@ -187,11 +187,49 @@ cmd_sync() {
     return 1
   fi
 
-  echo -e "${BLUE}🔄 Syncing '$project_name' -> $remote_url...${NC}"
-  rsync -avz --progress "$project_path/" "$remote_url/"
+  # Normalize remote URL and handle trailing slash
+  local remote_url="$remote_input"
+  if [[ "$remote_input" != *:* ]]; then
+    remote_url="$remote_input:tasks/$project_name"
+  fi
+  # Ensure remote_url ends with a slash for rsync content sync
+  remote_url="${remote_url%/}/"
+
+  echo -e "${BLUE}📤 Pushing '$project_name' -> $remote_url...${NC}"
+  rsync -avz --progress "$project_path/" "$remote_url"
 }
 
-# 9. PROJ: Create project structure
+# 9. PULL: Pull project from remote via rsync
+cmd_pull() {
+  local project_name="$1"
+  local remote_input="$2"
+
+  if [[ -z "$project_name" || -z "$remote_input" ]]; then
+    echo -e "${RED}Usage: tk pull {project_name} {user@host[:path]}${NC}"
+    return 1
+  fi
+
+  local project_path="$TASKS_DIR/$project_name"
+
+  # Create local project directory if it doesn't exist
+  if [[ ! -d "$project_path" ]]; then
+    echo -e "${YELLOW}📁 Local project folder not found. Creating $project_path...${NC}"
+    mkdir -p "$project_path"
+  fi
+
+  # Normalize remote URL and handle trailing slash
+  local remote_url="$remote_input"
+  if [[ "$remote_input" != *:* ]]; then
+    remote_url="$remote_input:tasks/$project_name"
+  fi
+  # Ensure remote_url ends with a slash for rsync content sync
+  remote_url="${remote_url%/}/"
+
+  echo -e "${BLUE}📥 Pulling '$project_name' <- $remote_url...${NC}"
+  rsync -avz --progress "$remote_url" "$project_path/"
+}
+
+# 10. PROJ: Create project structure
 cmd_proj() {
   local project_name="$1"
 
@@ -230,7 +268,8 @@ show_help() {
   echo -e "  ${GREEN}review${NC}            Move a task to the 'review' folder"
   echo -e "  ${GREEN}done${NC}              Move a task to the 'done' folder"
   echo -e "  ${GREEN}open${NC}              Search and open any task using fzf and nvim"
-  echo -e "  ${GREEN}sync {proj} {url}${NC} Sync project folder to a remote host via rsync"
+  echo -e "  ${GREEN}push {proj} {host}${NC} Push project folder to remote (assumes remote ~/tasks/)"
+  echo -e "  ${GREEN}pull {proj} {host}${NC} Pull project folder from remote (assumes remote ~/tasks/)"
   echo -e "\nOptions:"
   echo -e "  ${YELLOW}--help${NC}                 Show this help message"
   echo -e "  ${YELLOW}--help-ai-jira-sync${NC}    Show guide for AI-driven Jira task syncing"
@@ -260,7 +299,8 @@ open) cmd_open ;;
 review) cmd_review ;;
 done) cmd_done ;;
 init) cmd_init ;;
-sync) cmd_sync "$2" "$3" ;;
+push) cmd_push "$2" "$3" ;;
+pull) cmd_pull "$2" "$3" ;;
 proj) cmd_proj "$2" ;;
 --help) show_help ;;
 --help-ai-jira-sync) show_jira_help ;;
