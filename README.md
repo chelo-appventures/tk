@@ -53,14 +53,69 @@ Creates a new task from the template in the `backlog` directory of a selected pr
 ### `tk work`
 Allows you to select a task from any project to create a symbolic link in `00_WORKING`, marking it as your current priority.
 
-### `tk review`
-Move a task to the `review/` folder of its project. If the task was active in `00_WORKING`, the symbolic link is removed.
+### `tk review [subcommand]`
+Move a task to the `review/` folder of its project (when run without subcommands), or manage ticket diff reviews using `diffcomm`:
 
-### `tk done`
-Move a task to the `done/` folder of its project. If the task was active in `00_WORKING`, the symbolic link is removed.
+```bash
+# Initialize a review .diffc file for a ticket
+tk review init PROJ-123 [change1] [change2]
 
-### `tk open`
-Global task search with preview (`bat`) and automatic opening in Neovim.
+# Add an inline comment targeting a file and line
+tk review comment PROJ-123 --file src/app.py --line +12 --author HUMAN --text "Review line 12"
+
+# Add a threaded reply to an existing comment thread
+tk review reply PROJ-123 --file src/app.py --line +12 --author AI --text "Resolved"
+
+# Display colorized diff and inline comments
+tk review show PROJ-123
+
+# List all comments in tabular summary format
+tk review list PROJ-123
+
+# Export clean patch without blockquote comments
+tk review strip PROJ-123 -o clean.patch
+
+# Validate diff syntax and hunk line header counts
+tk review validate PROJ-123
+### `tk new [project] [slug] [title]` or `tk --new`
+Creates a new task. If `project` and `slug` are provided, runs non-interactively without `fzf` or `nvim` prompts.
+
+### `tk work [task-query]` or `tk --work`
+Links a task to `00_WORKING`. If `task-query` (e.g. ticket ID, slug, or file path) is provided, runs non-interactively without `fzf`.
+
+### `tk review [task-query]` or `tk --review`
+Moves a task to `review/`. If `task-query` is provided, runs non-interactively without `fzf`.
+
+### `tk done [task-query]` or `tk --done`
+Moves a task to `done/`. If `task-query` is provided, runs non-interactively without `fzf`.
+
+### `tk blocked [task-query]` or `tk --blocked`
+Moves a task to `blocked/`. If `task-query` is provided, runs non-interactively without `fzf`.
+
+### `tk open [task-query]` or `tk --open`
+Views or opens a task. When run non-interactively (e.g. by an AI agent), prints the task content to stdout.
+
+---
+
+## 🤖 AI Agent Non-Interactive Automation Guide
+
+All commands support direct positional parameters and `--flag` aliases for scripting and AI agents:
+
+```bash
+# Create task non-interactively
+tk --new MyProject PROJ-123-implement-auth "Implement OAuth Login"
+
+# Focus on task
+tk --work PROJ-123
+
+# Read task contents
+tk --open PROJ-123
+
+# Move task across statuses
+tk --review PROJ-123
+tk --done PROJ-123
+tk --blocked PROJ-123
+```
 
 ### `tk push {project} {user@host}`
 Pushes the content of a local project to the same path on a remote server (`~/tasks/{project}`). Example: `tk push my-project user@server`
