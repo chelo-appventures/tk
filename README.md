@@ -89,6 +89,9 @@ Moves a task to `review/`. If `task-query` is provided, runs non-interactively w
 ### `tk done [task-query]` or `tk --done`
 Moves a task to `done/`. If `task-query` is provided, runs non-interactively without `fzf`.
 
+### `tk archive [task-query]` or `tk --archive`
+Moves a completed task to `99_ARCHIVE/<project>/`. When run interactively, prioritizes `done/` tasks in `fzf`.
+
 ### `tk blocked [task-query]` or `tk --blocked`
 Moves a task to `blocked/`. If `task-query` is provided, runs non-interactively without `fzf`.
 

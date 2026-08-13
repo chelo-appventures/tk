@@ -87,6 +87,33 @@ find_task_file() {
   return 1
 }
 
+# Helper: Interactive task selector displaying relative paths (Project/status/filename.md)
+select_task_file_with_fzf() {
+  local prompt="$1"
+  local with_preview="$2"
+
+  local rel_file=""
+  if [[ "$with_preview" == "true" ]]; then
+    rel_file=$(
+      cd "$TASKS_DIR" || return
+      find . -mindepth 2 -not -path '*/.*' -not -path './00_WORKING/*' -not -path './99_ARCHIVE/*' -name "*.md" 2>/dev/null | \
+        sed 's|^\./||' | \
+        fzf --prompt "$prompt" --preview 'bat --color=always "$TASKS_DIR/{}" 2>/dev/null || cat "$TASKS_DIR/{}"' --height 60% --reverse
+    )
+  else
+    rel_file=$(
+      cd "$TASKS_DIR" || return
+      find . -mindepth 2 -not -path '*/.*' -not -path './00_WORKING/*' -not -path './99_ARCHIVE/*' -name "*.md" 2>/dev/null | \
+        sed 's|^\./||' | \
+        fzf --prompt "$prompt" --height 40% --reverse
+    )
+  fi
+
+  if [[ -n "$rel_file" ]]; then
+    echo "$TASKS_DIR/$rel_file"
+  fi
+}
+
 # 2. NEW: Create task from template
 cmd_new() {
   local project="$1"
@@ -111,9 +138,15 @@ cmd_new() {
     return 0
   fi
 
-  # Interactive fallback using fzf
-  local project_sel=$(find "$TASKS_DIR" -maxdepth 1 -type d -not -path "$TASKS_DIR" -not -path "*/.*" -not -path "*00_WORKING*" -not -path "*99_ARCHIVE*" | fzf --prompt "Select Project: ")
-  [[ -z "$project_sel" ]] && return
+  # Interactive fallback using fzf (relative directory selection)
+  local rel_project=$(
+    cd "$TASKS_DIR" || return
+    find . -maxdepth 1 -mindepth 1 -type d -not -path "*/.*" -not -path "./00_WORKING" -not -path "./99_ARCHIVE" -not -path "./reviews" 2>/dev/null | \
+      sed 's|^\./||' | \
+      fzf --prompt "Select Project: "
+  )
+  [[ -z "$rel_project" ]] && return
+  local project_sel="$TASKS_DIR/$rel_project"
 
   echo -n "Task title (slug): "
   read slug
@@ -141,7 +174,7 @@ cmd_work() {
       return 1
     fi
   else
-    file=$(find "$TASKS_DIR" -not -path '*/.*' -not -path "*/00_WORKING/*" -name "*.md" | fzf --prompt "Activate task: " --height 40% --reverse)
+    file=$(select_task_file_with_fzf "Activate task: ")
   fi
 
   if [[ -n "$file" ]]; then
@@ -163,7 +196,7 @@ cmd_open() {
       return 1
     fi
   else
-    file=$(find "$TASKS_DIR" -not -path '*/.*' -name "*.md" | fzf --preview 'bat --color=always {} 2>/dev/null || cat {}' --height 60% --reverse)
+    file=$(select_task_file_with_fzf "Open task: " "true")
   fi
 
   if [[ -n "$file" ]]; then
@@ -189,7 +222,7 @@ cmd_move() {
       return 1
     fi
   else
-    file=$(find "$TASKS_DIR" -not -path '*/.*' -not -path "*/00_WORKING/*" -name "*.md" | fzf --prompt "Move to $target_status: " --height 40% --reverse)
+    file=$(select_task_file_with_fzf "Move to $target_status: ")
   fi
 
   if [[ -n "$file" ]]; then
@@ -385,6 +418,53 @@ cmd_backlog() {
   cmd_move "backlog" "$1"
 }
 
+# 6d. ARCHIVE: Move completed task to 99_ARCHIVE
+cmd_archive() {
+  local query="$1"
+  local file=""
+
+  if [[ -n "$query" ]]; then
+    file=$(find_task_file "$query")
+    if [[ -z "$file" ]]; then
+      echo -e "${RED}Error: Task matching '$query' not found in $TASKS_DIR${NC}"
+      return 1
+    fi
+  else
+    # Interactive selection prioritizing done/ tasks
+    local rel_file=$(
+      cd "$TASKS_DIR" || return
+      find . -mindepth 2 -path '*/done/*' -not -path '*/.*' -name "*.md" 2>/dev/null | \
+        sed 's|^\./||' | \
+        fzf --prompt "Archive done task: " --height 40% --reverse
+    )
+    if [[ -n "$rel_file" ]]; then
+      file="$TASKS_DIR/$rel_file"
+    else
+      file=$(select_task_file_with_fzf "Archive task: ")
+    fi
+  fi
+
+  if [[ -n "$file" && -f "$file" ]]; then
+    local filename=$(basename "$file")
+    local project_name=$(basename $(dirname $(dirname "$file")))
+
+    local archive_dir="$TASKS_DIR/99_ARCHIVE"
+    if [[ "$project_name" != "tasks" && "$project_name" != "." && -n "$project_name" ]]; then
+      archive_dir="$TASKS_DIR/99_ARCHIVE/$project_name"
+    fi
+    mkdir -p "$archive_dir"
+    local dest="$archive_dir/$filename"
+
+    mv "$file" "$dest"
+
+    # Cleanup symlinks in 00_WORKING
+    find "$WORKING_DIR" -lname "$file" -delete 2>/dev/null
+    find "$WORKING_DIR" -name "$filename" -delete 2>/dev/null
+
+    echo -e "${GREEN}📦 Task archived to:${NC} $dest"
+  fi
+}
+
 # 7. INIT: Initialize structure and symbolic link
 cmd_init() {
   local bin_dir="$HOME/bin"
@@ -535,6 +615,7 @@ show_help() {
   echo -e "  ${GREEN}work | --work {task-query}${NC}               Link task to 00_WORKING (non-interactive if arg provided)"
   echo -e "  ${GREEN}review | --review {task-query}${NC}           Move task to 'review' folder"
   echo -e "  ${GREEN}done | --done {task-query}${NC}               Move task to 'done' folder"
+  echo -e "  ${GREEN}archive | --archive {task-query}${NC}        Move completed task to 99_ARCHIVE"
   echo -e "  ${GREEN}blocked | --blocked {task-query}${NC}         Move task to 'blocked' folder"
   echo -e "  ${GREEN}backlog | --backlog {task-query}${NC}         Move task to 'backlog' folder"
   echo -e "  ${GREEN}open | --open {task-query}${NC}               Open or view task contents"
@@ -577,6 +658,7 @@ work | current | cur | --work | --cur | --current) cmd_work "$2" ;;
 open | --open) cmd_open "$2" ;;
 review | --review) cmd_review "${@:2}" ;;
 done | --done) cmd_done "$2" ;;
+archive | --archive) cmd_archive "$2" ;;
 blocked | --blocked) cmd_blocked "$2" ;;
 backlog | --backlog) cmd_backlog "$2" ;;
 init | --init) cmd_init ;;
