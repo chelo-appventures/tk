@@ -78,6 +78,8 @@ class DiffDocument:
     def __init__(self):
         self.files: List[DiffFile] = []
         self.preamble: List[str] = []
+        self.raw_lines: List[str] = []
+        self.doc_line_map: dict = {}
 
 
 # --- Parser & Serializer ---
@@ -101,6 +103,7 @@ def parse_comment_line(line: str) -> Optional[Comment]:
 def parse_diffc(text: str) -> DiffDocument:
     doc = DiffDocument()
     lines = text.splitlines()
+    doc.raw_lines = lines
 
     current_file: Optional[DiffFile] = None
     current_hunk: Optional[Hunk] = None
@@ -112,6 +115,7 @@ def parse_diffc(text: str) -> DiffDocument:
     idx = 0
     while idx < len(lines):
         line = lines[idx]
+        doc_lineno = idx + 1
 
         # Check comment line first
         comment = parse_comment_line(line)
@@ -122,6 +126,7 @@ def parse_diffc(text: str) -> DiffDocument:
                 current_hunk.header_comments.append(comment)
             elif current_file is not None:
                 current_file.file_comments.append(comment)
+            doc.doc_line_map[doc_lineno] = (current_file, current_hunk, last_diff_line)
             idx += 1
             continue
 
@@ -136,6 +141,7 @@ def parse_diffc(text: str) -> DiffDocument:
             if m:
                 current_file.old_path = m.group(1)
                 current_file.new_path = m.group(2)
+            doc.doc_line_map[doc_lineno] = (current_file, None, None)
             idx += 1
             continue
 
@@ -148,6 +154,7 @@ def parse_diffc(text: str) -> DiffDocument:
             m = RE_HEADER_OLD.match(line)
             if m:
                 current_file.old_path = m.group(1)
+            doc.doc_line_map[doc_lineno] = (current_file, None, None)
             idx += 1
             continue
 
@@ -160,6 +167,7 @@ def parse_diffc(text: str) -> DiffDocument:
             m = RE_HEADER_NEW.match(line)
             if m:
                 current_file.new_path = m.group(1)
+            doc.doc_line_map[doc_lineno] = (current_file, None, None)
             idx += 1
             continue
 
@@ -182,43 +190,44 @@ def parse_diffc(text: str) -> DiffDocument:
 
             old_line_counter = old_start
             new_line_counter = new_start
+            doc.doc_line_map[doc_lineno] = (current_file, current_hunk, None)
             idx += 1
             continue
 
         # Header metadata lines (e.g., index ..., new file mode ...)
         if current_file is not None and current_hunk is None and not line.startswith(('+', '-', ' ')):
             current_file.headers.append(line)
+            doc.doc_line_map[doc_lineno] = (current_file, None, None)
             idx += 1
             continue
 
         # Preamble before any file header
         if current_file is None:
             doc.preamble.append(line)
+            doc.doc_line_map[doc_lineno] = (None, None, None)
             idx += 1
             continue
 
         # Hunk lines (+, -, ' ', \)
         if current_hunk is not None:
+            diff_line = None
             if line.startswith('+'):
                 diff_line = DiffLine('+', line[1:], old_lineno=None, new_lineno=new_line_counter)
                 new_line_counter += 1
-                current_hunk.lines.append(diff_line)
-                last_diff_line = diff_line
             elif line.startswith('-'):
                 diff_line = DiffLine('-', line[1:], old_lineno=old_line_counter, new_lineno=None)
                 old_line_counter += 1
-                current_hunk.lines.append(diff_line)
-                last_diff_line = diff_line
             elif line.startswith(' '):
                 diff_line = DiffLine(' ', line[1:], old_lineno=old_line_counter, new_lineno=new_line_counter)
                 old_line_counter += 1
                 new_line_counter += 1
-                current_hunk.lines.append(diff_line)
-                last_diff_line = diff_line
             elif line.startswith('\\'):
                 diff_line = DiffLine('\\', line[2:] if line.startswith('\\ ') else line[1:])
+
+            if diff_line:
                 current_hunk.lines.append(diff_line)
                 last_diff_line = diff_line
+                doc.doc_line_map[doc_lineno] = (current_file, current_hunk, diff_line)
 
         idx += 1
 
@@ -257,6 +266,24 @@ def strip_comments(text: str) -> str:
 
 
 # --- Line Lookup Engine ---
+
+# --- Line Lookup Engine ---
+
+def find_target_by_at_line(doc: DiffDocument, at_line: int) -> Tuple[Optional[DiffFile], Optional[Hunk], Optional[DiffLine]]:
+    if at_line in doc.doc_line_map:
+        return doc.doc_line_map[at_line]
+
+    if doc.doc_line_map:
+        max_line = max(doc.doc_line_map.keys())
+        search_start = min(at_line, max_line)
+        for l in range(search_start, 0, -1):
+            if l in doc.doc_line_map:
+                diff_file, hunk, diff_line = doc.doc_line_map[l]
+                if diff_line or hunk or diff_file:
+                    return diff_file, hunk, diff_line
+
+    return None, None, None
+
 
 def find_target_line(doc: DiffDocument, target_file: str, line_spec: str) -> Tuple[Optional[DiffFile], Optional[Hunk], Optional[DiffLine]]:
     # Find matching file
@@ -300,6 +327,36 @@ def find_target_line(doc: DiffDocument, target_file: str, line_spec: str) -> Tup
     return file_obj, None, None
 
 
+def resolve_comment_target(args: argparse.Namespace, doc: DiffDocument) -> Tuple[Optional[DiffFile], Optional[Hunk], Optional[DiffLine], str]:
+    # 1. Check --at or positional target_line
+    at_val = getattr(args, 'at', None) or getattr(args, 'target_line', None)
+    if at_val is not None:
+        try:
+            at_line = int(at_val)
+            diff_file, hunk, diff_line = find_target_by_at_line(doc, at_line)
+            return diff_file, hunk, diff_line, f"document line {at_line}"
+        except ValueError:
+            pass
+
+    # 2. Check --line if given without --file and --line is a plain integer
+    if not getattr(args, 'file', None) and getattr(args, 'line', None):
+        line_str = str(args.line).strip()
+        if not line_str.startswith(('+', '-')):
+            try:
+                at_line = int(line_str)
+                diff_file, hunk, diff_line = find_target_by_at_line(doc, at_line)
+                return diff_file, hunk, diff_line, f"document line {at_line}"
+            except ValueError:
+                pass
+
+    # 3. Traditional --file and --line
+    if getattr(args, 'file', None) and getattr(args, 'line', None):
+        diff_file, hunk, diff_line = find_target_line(doc, args.file, args.line)
+        return diff_file, hunk, diff_line, f"{args.file}:{args.line}"
+
+    return None, None, None, ""
+
+
 # --- Commands ---
 
 def cmd_init(args: argparse.Namespace) -> int:
@@ -332,10 +389,10 @@ def cmd_comment(args: argparse.Namespace) -> int:
     with open(path, 'r', encoding='utf-8') as f:
         doc = parse_diffc(f.read())
 
-    diff_file, hunk, diff_line = find_target_line(doc, args.file, args.line)
+    diff_file, hunk, diff_line, target_desc = resolve_comment_target(args, doc)
 
-    if not diff_file:
-        print(f"Error: File path '{args.file}' not found in diff.", file=sys.stderr)
+    if not diff_file and not hunk and not diff_line:
+        print(f"Error: Target line/file specified not found in '{path}'. Specify document line number (e.g. `diffcomm comment {path} 25 --author HUMAN --text ...`) or `--file` and `--line`.", file=sys.stderr)
         return 1
 
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
@@ -345,13 +402,13 @@ def cmd_comment(args: argparse.Namespace) -> int:
         diff_line.comments.append(comment)
     elif hunk:
         hunk.header_comments.append(comment)
-    else:
+    elif diff_file:
         diff_file.file_comments.append(comment)
 
     with open(path, 'w', encoding='utf-8') as f:
         f.write(serialize_diffc(doc))
 
-    print(f"Comment added to {args.file} at line {args.line}")
+    print(f"Comment added at {target_desc}")
     return 0
 
 
@@ -364,17 +421,19 @@ def cmd_reply(args: argparse.Namespace) -> int:
     with open(path, 'r', encoding='utf-8') as f:
         doc = parse_diffc(f.read())
 
-    diff_file, hunk, diff_line = find_target_line(doc, args.file, args.line)
+    diff_file, hunk, diff_line, target_desc = resolve_comment_target(args, doc)
 
-    if not diff_line or not diff_line.comments:
-        target_comments = diff_line.comments if diff_line else (hunk.header_comments if hunk else diff_file.file_comments if diff_file else [])
-        if not target_comments:
-            print(f"Error: No existing comment found at {args.file}:{args.line} to reply to.", file=sys.stderr)
-            return 1
+    if not diff_file and not hunk and not diff_line:
+        print(f"Error: Target line/file specified not found in '{path}'.", file=sys.stderr)
+        return 1
+
+    target_comments = diff_line.comments if diff_line else (hunk.header_comments if hunk else diff_file.file_comments if diff_file else [])
+    if not target_comments:
+        # If no existing comments, initialize top level or append
+        parent_depth = 1
     else:
-        target_comments = diff_line.comments
+        parent_depth = target_comments[-1].depth
 
-    parent_depth = target_comments[-1].depth if target_comments else 1
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
     reply_comment = Comment(author=args.author, timestamp=timestamp, text=args.text, depth=parent_depth + 1)
     target_comments.append(reply_comment)
@@ -382,7 +441,7 @@ def cmd_reply(args: argparse.Namespace) -> int:
     with open(path, 'w', encoding='utf-8') as f:
         f.write(serialize_diffc(doc))
 
-    print(f"Reply added to {args.file} at line {args.line}")
+    print(f"Reply added at {target_desc}")
     return 0
 
 
@@ -399,14 +458,14 @@ def cmd_list(args: argparse.Namespace) -> int:
 
     for diff_file in doc.files:
         filename = diff_file.new_path or diff_file.old_path
-        if args.file and not diff_file.matches_path(args.file):
+        if getattr(args, 'file', None) and not diff_file.matches_path(args.file):
             continue
 
         for hunk in diff_file.hunks:
             for line in hunk.lines:
                 lineno = f"+{line.new_lineno}" if line.new_lineno else (f"-{line.old_lineno}" if line.old_lineno else "?")
                 for c in line.comments:
-                    if args.author and c.author.lower() != args.author.lower():
+                    if getattr(args, 'author', None) and c.author.lower() != args.author.lower():
                         continue
                     comments_found.append((filename, lineno, c.author, c.timestamp, c.depth, c.text))
 
@@ -433,37 +492,46 @@ def cmd_show(args: argparse.Namespace) -> int:
         content = f.read()
 
     use_color = not args.no_color and sys.stdout.isatty()
+    show_lineno = getattr(args, 'line_numbers', False)
 
     COLOR_RESET = "\033[0m"
     COLOR_GREEN = "\033[32m"
     COLOR_RED = "\033[31m"
     COLOR_CYAN = "\033[36m"
     COLOR_YELLOW = "\033[33m"
+    COLOR_GRAY = "\033[90m"
     COLOR_BOLD = "\033[1m"
 
-    for line in content.splitlines():
+    lines = content.splitlines()
+    max_digits = len(str(len(lines)))
+
+    for idx, line in enumerate(lines, 1):
+        prefix_str = f"{idx:>{max_digits}} | " if show_lineno else ""
+        if use_color and show_lineno:
+            prefix_str = f"{COLOR_GRAY}{prefix_str}{COLOR_RESET}"
+
         if RE_COMMENT.match(line) or line.strip().startswith('>'):
             if use_color:
-                print(f"{COLOR_YELLOW}{COLOR_BOLD}{line}{COLOR_RESET}")
+                print(f"{prefix_str}{COLOR_YELLOW}{COLOR_BOLD}{line}{COLOR_RESET}")
             else:
-                print(line)
+                print(f"{prefix_str}{line}")
         elif line.startswith('@@'):
             if use_color:
-                print(f"{COLOR_CYAN}{line}{COLOR_RESET}")
+                print(f"{prefix_str}{COLOR_CYAN}{line}{COLOR_RESET}")
             else:
-                print(line)
+                print(f"{prefix_str}{line}")
         elif line.startswith('+'):
             if use_color:
-                print(f"{COLOR_GREEN}{line}{COLOR_RESET}")
+                print(f"{prefix_str}{COLOR_GREEN}{line}{COLOR_RESET}")
             else:
-                print(line)
+                print(f"{prefix_str}{line}")
         elif line.startswith('-'):
             if use_color:
-                print(f"{COLOR_RED}{line}{COLOR_RESET}")
+                print(f"{prefix_str}{COLOR_RED}{line}{COLOR_RESET}")
             else:
-                print(line)
+                print(f"{prefix_str}{line}")
         else:
-            print(line)
+            print(f"{prefix_str}{line}")
 
     return 0
 
@@ -566,14 +634,16 @@ Run 'diffcomm <command> --help' for details on a specific subcommand.
     # comment
     p_comment = subparsers.add_parser(
         "comment",
-        help="Add an inline blockquote comment to a target file and line",
-        description="Inserts a top-level blockquote comment (> [AUTHOR @ TIMESTAMP]: text) directly beneath the specified diff line.",
-        epilog="Example:\n  diffcomm comment review.diffc --file src/main.py --line +42 --author HUMAN --text 'Review this function'\n\nLine specs:\n  +42 : Line 42 in NEW file\n  -30 : Line 30 in OLD file\n  5   : 5th line inside hunk body",
+        help="Add an inline blockquote comment to a target line",
+        description="Inserts a top-level blockquote comment (> [AUTHOR @ TIMESTAMP]: text) directly beneath the specified line.",
+        epilog="Examples:\n  diffcomm comment review.diffc 25 --author HUMAN --text 'Review this line'  (Document line 25)\n  diffcomm comment review.diffc --file src/main.py --line +42 --author HUMAN --text 'Check logic'\n\nLine specs:\n  25  : 25th line in document (visible via `diffcomm show -n`)\n  +42 : Line 42 in NEW file\n  -30 : Line 30 in OLD file",
         formatter_class=argparse.RawDescriptionHelpFormatter
     )
     p_comment.add_argument("diffc_file", help="Path to target .diffc file")
-    p_comment.add_argument("--file", required=True, help="Target file relative path (e.g., src/main.py)")
-    p_comment.add_argument("--line", required=True, help="Target line specifier (+N for new line, -N for old line, or hunk line index)")
+    p_comment.add_argument("target_line", nargs="?", help="Document line number (e.g., 25)")
+    p_comment.add_argument("--at", help="Document line number (e.g., --at 25)")
+    p_comment.add_argument("--file", help="Target file relative path (e.g., src/main.py)")
+    p_comment.add_argument("--line", help="Target line specifier (+N, -N, or document line number)")
     p_comment.add_argument("--author", required=True, help="Author identifier (e.g. HUMAN or AI)")
     p_comment.add_argument("--text", required=True, help="Comment body text")
     p_comment.set_defaults(func=cmd_comment)
@@ -583,12 +653,14 @@ Run 'diffcomm <command> --help' for details on a specific subcommand.
         "reply",
         help="Add a threaded reply to an existing comment block",
         description="Appends a nested reply block (> > [AUTHOR @ TIMESTAMP]: text) under an existing comment thread.",
-        epilog="Example:\n  diffcomm reply review.diffc --file src/main.py --line +42 --author AI --text 'Addressed in commit 8f2a1b'",
+        epilog="Examples:\n  diffcomm reply review.diffc 25 --author AI --text 'Addressed'\n  diffcomm reply review.diffc --file src/main.py --line +42 --author AI --text 'Addressed'",
         formatter_class=argparse.RawDescriptionHelpFormatter
     )
     p_reply.add_argument("diffc_file", help="Path to target .diffc file")
-    p_reply.add_argument("--file", required=True, help="Target file relative path")
-    p_reply.add_argument("--line", required=True, help="Target line specifier (+N, -N, or index)")
+    p_reply.add_argument("target_line", nargs="?", help="Document line number (e.g., 25)")
+    p_reply.add_argument("--at", help="Document line number (e.g., --at 25)")
+    p_reply.add_argument("--file", help="Target file relative path")
+    p_reply.add_argument("--line", help="Target line specifier (+N, -N, or document line number)")
     p_reply.add_argument("--author", required=True, help="Author identifier (e.g. HUMAN or AI)")
     p_reply.add_argument("--text", required=True, help="Reply body text")
     p_reply.set_defaults(func=cmd_reply)
@@ -611,10 +683,11 @@ Run 'diffcomm <command> --help' for details on a specific subcommand.
         "show",
         help="Display diff and inline comments with ANSI color highlighting",
         description="Renders the annotated diff in terminal with color highlighting (+ green, - red, @@ cyan, > yellow).",
-        epilog="Example:\n  diffcomm show review.diffc\n  diffcomm show review.diffc --no-color",
+        epilog="Example:\n  diffcomm show review.diffc -n\n  diffcomm show review.diffc --no-color",
         formatter_class=argparse.RawDescriptionHelpFormatter
     )
     p_show.add_argument("diffc_file", help="Path to target .diffc file")
+    p_show.add_argument("-n", "--line-numbers", action="store_true", help="Display document line numbers on the left margin")
     p_show.add_argument("--no-color", action="store_true", help="Disable ANSI color codes")
     p_show.set_defaults(func=cmd_show)
 

@@ -81,6 +81,10 @@ git diff | ./diffcomm.py init review.diffc
 Inserts a top-level blockquote comment directly below a target file line.
 
 ```bash
+# Easy Document Line Numbering (e.g. line 8 visible via `diffcomm show -n`):
+./diffcomm.py comment review.diffc 8 --author HUMAN --text "Check validity logic"
+
+# Or using --file and --line:
 ./diffcomm.py comment review.diffc \
   --file src/app.py \
   --line +12 \
@@ -89,9 +93,10 @@ Inserts a top-level blockquote comment directly below a target file line.
 ```
 
 #### Line Addressing Syntax:
-- `--line +12`: Targets line `12` in the **new file** (`+`).
-- `--line -10`: Targets line `10` in the **old file** (`-`).
-- `--line 5`: Targets the 5th line within the diff hunk.
+- `8` or `--at 8`: Physical line number `8` of the `.diffc` file (visible via `diffcomm show -n`).
+- `--line +12`: Line `12` in the **new file** (`+`).
+- `--line -10`: Line `10` in the **old file** (`-`).
+- `--line 5`: 5th line within the diff hunk.
 
 ---
 
@@ -99,11 +104,7 @@ Inserts a top-level blockquote comment directly below a target file line.
 Adds a nested reply block (`> >`) to an existing comment thread at a specific line.
 
 ```bash
-./diffcomm.py reply review.diffc \
-  --file src/app.py \
-  --line +12 \
-  --author AI \
-  --text "Added zero check guard clause in commit 8f2a1b."
+./diffcomm.py reply review.diffc 9 --author AI --text "Added zero check guard clause in commit 8f2a1b."
 ```
 
 ---
@@ -116,7 +117,8 @@ Prints the unified diff and inline comments to the terminal with ANSI color high
 - Comments (`>`) in **Yellow / Bold**
 
 ```bash
-./diffcomm.py show review.diffc
+# Display document line numbers on the left margin (-n):
+./diffcomm.py show review.diffc -n
 
 # Plain text output (no colors):
 ./diffcomm.py show review.diffc --no-color

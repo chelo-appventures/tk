@@ -60,14 +60,17 @@ Move a task to the `review/` folder of its project (when run without subcommands
 # Initialize a review .diffc file for a ticket
 tk review init PROJ-123 [change1] [change2]
 
-# Add an inline comment targeting a file and line
+# Display diff with document line numbers on the left margin
+tk review show PROJ-123 -n
+
+# Add a comment using physical document line number (e.g., line 8 from `show -n`)
+tk review comment PROJ-123 8 --author HUMAN --text "Check validity logic"
+
+# Or add a comment using --file and --line
 tk review comment PROJ-123 --file src/app.py --line +12 --author HUMAN --text "Review line 12"
 
-# Add a threaded reply to an existing comment thread
-tk review reply PROJ-123 --file src/app.py --line +12 --author AI --text "Resolved"
-
-# Display colorized diff and inline comments
-tk review show PROJ-123
+# Reply to an existing comment (e.g. at line 9)
+tk review reply PROJ-123 9 --author AI --text "Resolved"
 
 # List all comments in tabular summary format
 tk review list PROJ-123
@@ -77,6 +80,8 @@ tk review strip PROJ-123 -o clean.patch
 
 # Validate diff syntax and hunk line header counts
 tk review validate PROJ-123
+```
+
 ### `tk new [project] [slug] [title]` or `tk --new`
 Creates a new task. If `project` and `slug` are provided, runs non-interactively without `fzf` or `nvim` prompts.
 
