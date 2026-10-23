@@ -602,6 +602,68 @@ cmd_proj() {
   echo -e "${GREEN}✅ Project created in $project_path${NC}"
 }
 
+# 11. BOARD: Render ~/tasks as a Trello-like board (HTML)
+cmd_board() {
+  local mode="build"
+  local project=""
+  local out=""
+  local port="8765"
+  local open_browser=false
+  local serve_mode=false
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      serve|--serve) serve_mode=true; shift ;;
+      build|--build) serve_mode=false; shift ;;
+      --project|-p) project="$2"; shift 2 ;;
+      --out|-o) out="$2"; shift 2 ;;
+      --port) port="$2"; shift 2 ;;
+      --open) open_browser=true; shift ;;
+      --no-open) open_browser=false; shift ;;
+      -h|--help)
+        echo -e "${BLUE}tk board${NC}"
+        echo -e "Usage: tk board [project] [--serve] [--open] [--out FILE] [--port N]"
+        echo -e ""
+        echo -e "  ${GREEN}tk board${NC}                     Build the board (default: ~/.tk/board/index.html)"
+        echo -e "  ${GREEN}tk board serve${NC}              Serve the board live (drag & drop moves the files)"
+        echo -e "  ${GREEN}tk board tructa-adm${NC}        Build the board for a single project"
+        echo -e "  ${GREEN}tk board --open${NC}            Build and open it in the browser"
+        return 0
+        ;;
+      -*) echo -e "${RED}Unknown option: $1${NC}"; return 1 ;;
+      *) project="$1"; shift ;;
+    esac
+  done
+
+  local board_script="$SCRIPT_DIR/board.py"
+  if [[ ! -f "$board_script" ]]; then
+    echo -e "${RED}Error: board.py not found in $SCRIPT_DIR${NC}"
+    return 1
+  fi
+
+  if [[ ! -d "$TASKS_DIR" ]]; then
+    echo -e "${RED}Error: tasks directory not found: $TASKS_DIR${NC}"
+    return 1
+  fi
+
+  local python_bin="python3"
+  local args=("$board_script")
+
+  if [[ "$serve_mode" == "true" ]]; then
+    args+=("serve" "--port" "$port")
+    [[ -n "$project" ]] && args+=("--project" "$project")
+    [[ "$open_browser" == "true" ]] && args+=("--open")
+    exec "$python_bin" "${args[@]}"
+  else
+    mode="build"
+    args+=("build")
+    [[ -n "$out" ]] && args+=("--out" "$out")
+    [[ -n "$project" ]] && args+=("--project" "$project")
+    [[ "$open_browser" == "true" ]] && args+=("--open")
+    "$python_bin" "${args[@]}"
+  fi
+}
+
 # --- HELP FUNCTIONS ---
 
 show_help() {
@@ -619,6 +681,10 @@ show_help() {
   echo -e "  ${GREEN}blocked | --blocked {task-query}${NC}         Move task to 'blocked' folder"
   echo -e "  ${GREEN}backlog | --backlog {task-query}${NC}         Move task to 'backlog' folder"
   echo -e "  ${GREEN}open | --open {task-query}${NC}               Open or view task contents"
+  echo -e "\nBoard Commands:"
+  echo -e "  ${GREEN}board | --board {project}${NC}                 Build a Trello-like board of all projects (HTML)"
+  echo -e "  ${GREEN}board serve${NC}                              Serve the board live (drag & drop moves the files)"
+  echo -e "  ${GREEN}board {project} --open${NC}                  Build the board for one project and open it"
   echo -e "\nDiff Review Commands (via diffcomm):"
   echo -e "  ${GREEN}review init <id> [c1] [c2]${NC}               Generate .diffc review file for ticket"
   echo -e "  ${GREEN}review show <id|file>${NC}                    Display colorized diff and inline comments"
@@ -665,6 +731,10 @@ init | --init) cmd_init ;;
 push | --push) cmd_push "$2" "$3" ;;
 pull | --pull) cmd_pull "$2" "$3" ;;
 project | proj | --proj | --project) cmd_proj "$2" ;;
+board | --board)
+  shift
+  cmd_board "$@"
+  ;;
 --help | -h) show_help ;;
 --help-ai-jira-sync) show_jira_help ;;
 *)

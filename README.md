@@ -8,6 +8,7 @@
 - **FZF-powered Workflow:** Interactive selection of projects and tasks.
 - **Native Markdown:** All tasks are `.md` files, allowing you to use any text editor.
 - **Organized Structure:** Automatic classification into `backlog`, `review`, `blocked`, and `done`.
+- **Trello-like Board:** `tk board` renders every project as a Kanban board (HTML) with live drag & drop.
 
 ## 🛠 Requirements
 
@@ -17,6 +18,7 @@ For `tk` to function correctly, you need the following installed:
 - [**fzf**](https://github.com/junegunn/fzf): For interactive searching.
 - [**bat**](https://github.com/sharkdp/bat): For task previews (optional but recommended).
 - [**Neovim (nvim)**](https://neovim.io/): As the default editor for tasks.
+- **Python 3** (standard library only): Required by `tk board` and `tk review` (`diffcomm.py`).
 
 ## 📂 Directory Structure
 
@@ -102,6 +104,38 @@ Moves a task to `blocked/`. If `task-query` is provided, runs non-interactively 
 
 ### `tk open [task-query]` or `tk --open`
 Views or opens a task. When run non-interactively (e.g. by an AI agent), prints the task content to stdout.
+
+### `tk board [project] [options]`
+Renders `~/tasks` as a Trello-like board — one Kanban board per project, with the four
+status folders as columns (`backlog` → `review` → `blocked` → `done`).
+
+```bash
+tk board                      # build the board (default: ~/.tk/board/index.html)
+tk board --open               # build it and open it in the browser
+tk board tructa-adm           # only one project
+tk board --out /tmp/b.html    # custom output path
+tk board serve                # live mode (see below)
+tk board serve --port 9000    # live mode on a different port
+```
+
+**Static mode** writes a single self-contained HTML file (no server, no dependencies,
+works offline). Features:
+
+- Board tabs per project + an "All projects" view.
+- Columns = the status folders; card counts per column.
+- Click a card for a full modal (description, plan, TODO checklist, notes, references).
+- Task ID / phase chips, TODO progress bar, creation date.
+- Search box (`/` to focus), dark/light theme (`?theme=light` also works), deep links:
+  `#project=NAME` and `#card=PROJECT/FILE`.
+
+**Live mode** (`tk board serve`) starts a local server on `http://127.0.0.1:8765` and
+enables **drag & drop**: dropping a card in another column physically moves the
+markdown file, exactly like `tk review|done|blocked|backlog` does (including the
+`00_WORKING` symlink cleanup). The modal also gets action buttons to move a card or
+pin it to `00_WORKING` (`tk work`).
+
+> `tk board serve` binds to `127.0.0.1` only — it is meant to run on your own machine.
+> It moves real files under `~/tasks`, so keep an eye on what you drop.
 
 ---
 
