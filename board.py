@@ -259,6 +259,27 @@ def project_label(name: str) -> str:
     return re.sub(r"^\d+[_-]\s*", "", name)
 
 
+def natural_key(text: str) -> list:
+    """Sort key that compares embedded numbers numerically.
+
+    'TRUCTA-ADM-6' -> ['tructa-adm-', 6]
+    'TRUCTA-ADM-54' -> ['tructa-adm-', 54]
+    So 6 sorts before 54 instead of after it (plain string sort would be wrong).
+    """
+    return [int(part) if part.isdigit() else part.lower() for part in re.split(r"(\d+)", text or "")]
+
+
+def task_sort_key(task: dict) -> tuple:
+    """Order cards inside a column: by ticket ID first, then by filename.
+
+    Tasks without an ID (or with a non-numeric one) fall back to their
+    filename, which usually starts with the creation date.
+    """
+    if task["id"]:
+        return (0, natural_key(task["id"]), natural_key(task["file"]))
+    return (1, natural_key(task["file"]), natural_key(task["file"]))
+
+
 def discover_projects(tasks_dir: Path) -> list[Path]:
     projects = []
     for entry in sorted(tasks_dir.iterdir()):
@@ -311,6 +332,7 @@ def build_state(tasks_dir: Path, project_filter: str | None = None) -> dict:
                 task["status"] = status
                 task["working"] = os.path.realpath(task_file) in working
                 columns[status].append(task)
+            columns[status].sort(key=task_sort_key)
 
         total = sum(len(v) for v in columns.values())
         projects.append(
